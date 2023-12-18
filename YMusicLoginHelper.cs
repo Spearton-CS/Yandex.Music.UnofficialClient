@@ -58,7 +58,7 @@ namespace Yandex.Music.UnofficialClient
             else
                 throw new NotSupportedException("Now supported only Login + Password method, and two-factor authorizations phone_confirmation and mobile_id");
         }
-        public async Task<string> GetTokenAsync(string code)
+        public async Task<string> GetTokenByCodeAsync(string code)
         {
             if (Disposed)
                 throw new ObjectDisposedException("YMusicLoginHelper");
