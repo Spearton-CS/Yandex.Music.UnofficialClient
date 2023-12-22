@@ -10,6 +10,8 @@
             if (Parent?.TracksCache.ContainsKey(this) == true)
                 if (Parent.TracksCache[this] > 0)
                     return;
+                else
+                    Parent.TracksCache.Remove(this);
             Disposed = true;
             ID = Title = ImageURL = null;
             if (Parent?.Disposed == false)
@@ -45,11 +47,10 @@
             GC.SuppressFinalize(this);
         }
         public YMusicApi Parent { get; private set; }
-        public Track(YMusicApi api, string id, KeyValuePair<string, string> dlnks, string title, uint duration, bool exp, string img, (KeyValuePair<float, float>, KeyValuePair<float, float>) fade, Artist[] artists, Album[] albums)
+        public Track(YMusicApi api, string id, string title, uint duration, bool exp, string img, (KeyValuePair<float, float>, KeyValuePair<float, float>) fade, Artist[] artists, Album[] albums)
         {
             Parent = api;
             ID = id;
-            DirectLinks = dlnks;
             Title = title;
             Duration = duration;
             Explicit = exp;
@@ -59,7 +60,6 @@
             Albums = albums;
         }
         public string ID { get; private set; }
-        public KeyValuePair<string, string> DirectLinks { get; }
         public string Title { get; private set; }
         public uint Duration { get; }
         public bool Explicit { get; }
@@ -68,7 +68,11 @@
         public Artist[] Artists { get; private set; }
         public Album[] Albums { get; private set; }
         public bool Downloaded => Disposed ? throw new ObjectDisposedException("Track") : File.Exists($"{Cache.DownloadedTracksCacheDir}\\{ID}.mp3");
-        public async Task<Stream> GetStreamAsync(bool hq = true) => Disposed ? throw new ObjectDisposedException("Track") : await Temp.HttpClient.GetStreamAsync(hq ? DirectLinks.Key : DirectLinks.Value);
+        public async Task<Stream> GetStreamAsync(bool hq = true)
+        {
+            var directLinks = await Parent.GetDirectLinksAsync(ID);
+            return Disposed ? throw new ObjectDisposedException("Track") : await Temp.HttpClient.GetStreamAsync(hq ? directLinks.Key : directLinks.Value);
+        }
         public async Task DownloadAsync(bool hq = true, string? path = null)
         {
             if (Disposed)
