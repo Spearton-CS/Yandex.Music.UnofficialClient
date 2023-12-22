@@ -112,7 +112,7 @@ namespace Yandex.Music.UnofficialClient
             userDisplayName = account.Value<string>("displayName");
             userEmail = result.Value<string>("defaultEmail");
         }
-        public async Task LoadSettingsAsync(Settings settings)
+        public async Task GetSettingsAsync(Settings settings)
         {
             var info = (await AccountApi.ShowSettings())["result"];
             if (settings.Theme == "black" || settings.Theme == "light")
@@ -133,9 +133,9 @@ namespace Yandex.Music.UnofficialClient
             };
             var result = await AccountApi.SettingsChanged(sync);
         }
-        public async IAsyncEnumerable<Track> SearchTracksAsync(string request, int maximum = 10, bool noCorrect = false)
+        public async IAsyncEnumerable<Track> SearchTracksAsync(string request, int page = 0, int size = 10, bool noCorrect = false, bool best = false)
         {
-            var search = (await SearchApi.Search(request, 0, maximum, "track", noCorrect))?["result"]?["tracks"];
+            var search = (best ? (await SearchApi.SearchBest(request, page, size, "track", noCorrect)) : (await SearchApi.Search(request, page, size, "track", noCorrect)))?["result"]?["tracks"];
             if (search is null || search.Value<uint>("total") == 0)
                 yield break;
             foreach (var track in search["results"])
@@ -160,7 +160,7 @@ namespace Yandex.Music.UnofficialClient
                 duration = track.Value<uint>("durationMs");
                 exp = track.Value<string>("contentWarning") == "explicit";
                 var fadeInfo = track["fade"];
-                fade = (new(fadeInfo.Value<float>("inStart"), fadeInfo.Value<float>("inStop")), new(fadeInfo.Value<float>("outStart"), fadeInfo.Value<float>("outStop")));
+                fade = fadeInfo is null ? (new(), new()) : (new(fadeInfo.Value<float>("inStart"), fadeInfo.Value<float>("inStop")), new(fadeInfo.Value<float>("outStart"), fadeInfo.Value<float>("outStop")));
                 img = track.Value<string>("coverUri");
                 var artInfo = track["artists"];
                 artists = new Artist[artInfo.Count()];
@@ -171,12 +171,16 @@ namespace Yandex.Music.UnofficialClient
                     var foundedArts = ArtistsCache.Where((x) => x.Key.ID == artID);
                     if (foundedArts.Any())
                     {
-                        var inf = foundedArts.First();
-                        ArtistsCache[inf.Key]++;
-                        artists[i] = inf.Key;
+                        Artist inf = foundedArts.First().Key;
+                        ArtistsCache[inf]++;
+                        artists[i] = inf;
                         continue;
                     }
-                    Artist artInf = await GetArtistAsync(artID);
+                    string name, artImg;
+                    name = artist.Value<string>("name");
+                    artImg = artist["cover"]?.Value<string>("uri");
+                    Artist artInf = new(this, artID, name, artImg);
+                    ArtistsCache.Add(artInf, 1);
                     artists[i] = artInf;
                 }
                 var albInfo = track["albums"];
@@ -192,7 +196,53 @@ namespace Yandex.Music.UnofficialClient
                         AlbumsCache[inf.Key]++;
                         albums[i] = inf.Key;
                     }
-                    albums[i] = await GetAlbumAsync(albID);
+                    string albTitle, albImg, genre;
+                    uint year, tracks, likes;
+                    DateTime release;
+                    bool single, albExp, recent, vimp;
+                    Artist[] albArtists;
+                    albTitle = album.Value<string>("title");
+                    genre = album.Value<string>("genre");
+                    try
+                    {
+                        single = album.Value<string>("type") == "single";
+                    }
+                    catch
+                    {
+                        single = false;
+                    }
+                    year = album.Value<uint>("year");
+                    release = album.Value<DateTime>("releaseDate");
+                    albExp = album.Value<string>("contentWarning") == "explicit";
+                    tracks = album.Value<uint>("trackCount");
+                    likes = album.Value<uint>("likesCount");
+                    recent = album.Value<bool>("recent");
+                    vimp = album.Value<bool>("veryImportant");
+                    albImg = album.Value<string>("coverUri");
+                    var albArtInfo = album["artists"];
+                    albArtists = new Artist[albArtInfo.Count()];
+                    for (int j = 0; j < albArtists.Length; j++)
+                    {
+                        var artist = albArtInfo[j];
+                        string artID = artist.Value<string>("id");
+                        var foundedArts = ArtistsCache.Where((x) => x.Key.ID == artID);
+                        if (foundedArts.Any())
+                        {
+                            Artist inf = foundedArts.First().Key;
+                            ArtistsCache[inf]++;
+                            albArtists[i] = inf;
+                            continue;
+                        }
+                        string name, artImg;
+                        name = artist.Value<string>("name");
+                        artImg = artist["cover"].Value<string>("uri");
+                        Artist artInf = new(this, artID, name, artImg);
+                        ArtistsCache.Add(artInf, 1);
+                        albArtists[j] = artInf;
+                    }
+                    Album albInf = new(this, albID, albTitle, genre, single, year, release, albExp, tracks, likes, recent, vimp, albImg, albArtists);
+                    AlbumsCache.Add(albInf, 1);
+                    albums[i] = albInf;
                 }
                 using Track info = new(this, id, title, duration, exp, img, fade, artists, albums); //Replace to get track by id....
                 TracksCache.Add(info, 1);
@@ -201,9 +251,9 @@ namespace Yandex.Music.UnofficialClient
                     TracksCache.Remove(info);
             }
         }
-        public async IAsyncEnumerable<Artist> SearchArtistsAsync(string request, int maximum = 10, bool noCorrect = false)
+        public async IAsyncEnumerable<Artist> SearchArtistsAsync(string request, int page = 0, int size = 10, bool noCorrect = false, bool best = false)
         {
-            var search = (await SearchApi.Search(request, 0, maximum, "artist", noCorrect))["result"]["artists"];
+            var search = (best ? (await SearchApi.SearchBest(request, page, size, "artist", noCorrect)) : (await SearchApi.Search(request, page, size, "artist", noCorrect)))["result"]["artists"];
             if (search is null || search.Value<uint>("total") == 0)
                 yield break;
             foreach (var artist in search["results"])
@@ -251,9 +301,9 @@ namespace Yandex.Music.UnofficialClient
                     ArtistsCache.Remove(info);
             }
         }
-        public async IAsyncEnumerable<Album> SearchAlbumsAsync(string request, int maximum = 10, bool noCorrect = false)
+        public async IAsyncEnumerable<Album> SearchAlbumsAsync(string request, int page = 0, int size = 10, bool noCorrect = false, bool best = false)
         {
-            var search = (await SearchApi.Search(request, 0, maximum, "album", noCorrect))["result"]["albums"];
+            var search = (best ? (await SearchApi.SearchBest(request, page, size, "album", noCorrect)) : (await SearchApi.Search(request, page, size, "album", noCorrect)))["result"]["albums"];
             if (search is null || search.Value<uint>("total") == 0)
                 yield break;
             foreach (var album in search["results"])
@@ -309,7 +359,11 @@ namespace Yandex.Music.UnofficialClient
                         artists[i] = inf.Key;
                         continue;
                     }
-                    Artist artInf = await GetArtistAsync(artID);
+                    string name, artImg;
+                    name = artist.Value<string>("name");
+                    artImg = artist["cover"]?.Value<string>("uri");
+                    Artist artInf = new(this, artID, name, artImg);
+                    ArtistsCache.Add(artInf, 1);
                     artists[i] = artInf;
                 }
                 using Album info = new(this, id, title, genre, single, year, release, exp, tracks, likes, recent, vimp, img, artists);
@@ -319,8 +373,9 @@ namespace Yandex.Music.UnofficialClient
                     AlbumsCache.Remove(info);
             }
         }
-        public async IAsyncEnumerable<Playlist> SearchPlaylistsAsync(string request, int maximum = 10, bool noCorrect = false)
+        public async IAsyncEnumerable<Playlist> SearchPlaylistsAsync(string request, int page = 0, int size = 10, bool noCorrect = false, bool best = false)
         {
+            
             yield break;
         }
         public async IAsyncEnumerable<Track> EnumerateLikedTracksAsync()
@@ -332,7 +387,6 @@ namespace Yandex.Music.UnofficialClient
             foreach (var track in search)
                 ids.Add(track.Value<string>("id"));
             search = await TrackApi.GetInformTrack(ids);
-            File.WriteAllText("likes.txt", search.ToString());
             foreach (var track in search["result"])
             {
                 string id = track.Value<string>("id");
@@ -370,7 +424,12 @@ namespace Yandex.Music.UnofficialClient
                         artists[i] = inf;
                         continue;
                     }
-                    artists[i] = await GetArtistAsync(artID);
+                    string name, artImg;
+                    name = artist.Value<string>("name");
+                    artImg = artist["cover"]?.Value<string>("uri");
+                    Artist artInf = new(this, artID, name, artImg);
+                    ArtistsCache.Add(artInf, 1);
+                    artists[i] = artInf;
                 }
                 var albInfo = track["albums"];
                 albums = new Album[albInfo.Count()];
@@ -385,7 +444,53 @@ namespace Yandex.Music.UnofficialClient
                         AlbumsCache[inf]++;
                         albums[i] = inf;
                     }
-                    albums[i] = await GetAlbumAsync(albID);
+                    string albTitle, albImg, genre;
+                    uint year, tracks, likes;
+                    DateTime release;
+                    bool single, albExp, recent, vimp;
+                    Artist[] albArtists;
+                    albTitle = album.Value<string>("title");
+                    genre = album.Value<string>("genre");
+                    try
+                    {
+                        single = album.Value<string>("type") == "single";
+                    }
+                    catch
+                    {
+                        single = false;
+                    }
+                    year = album.Value<uint>("year");
+                    release = album.Value<DateTime>("releaseDate");
+                    albExp = album.Value<string>("contentWarning") == "explicit";
+                    tracks = album.Value<uint>("trackCount");
+                    likes = album.Value<uint>("likesCount");
+                    recent = album.Value<bool>("recent");
+                    vimp = album.Value<bool>("veryImportant");
+                    albImg = album.Value<string>("coverUri");
+                    var albArtInfo = album["artists"];
+                    albArtists = new Artist[albArtInfo.Count()];
+                    for (int j = 0; j < albArtists.Length; j++)
+                    {
+                        var artist = albArtInfo[j];
+                        string artID = artist.Value<string>("id");
+                        var foundedArts = ArtistsCache.Where((x) => x.Key.ID == artID);
+                        if (foundedArts.Any())
+                        {
+                            Artist inf = foundedArts.First().Key;
+                            ArtistsCache[inf]++;
+                            albArtists[i] = inf;
+                            continue;
+                        }
+                        string name, artImg;
+                        name = artist.Value<string>("name");
+                        artImg = artist["cover"].Value<string>("uri");
+                        Artist artInf = new(this, artID, name, artImg);
+                        ArtistsCache.Add(artInf, 1);
+                        albArtists[j] = artInf;
+                    }
+                    Album albInf = new(this, albID, title, genre, single, year, release, albExp, tracks, likes, recent, vimp, albImg, albArtists);
+                    AlbumsCache.Add(albInf, 1);
+                    albums[i] = albInf;
                 }
                 Track info = new(this, id, title, duration, exp, img, fade, artists, albums); //Replace to get track by id....
                 TracksCache.Add(info, 1);
@@ -414,7 +519,7 @@ namespace Yandex.Music.UnofficialClient
             duration = track.Value<uint>("durationMs");
             exp = track.Value<string>("contentWarning") == "explicit";
             var fadeInfo = track["fade"];
-            fade = (new(fadeInfo.Value<float>("inStart"), fadeInfo.Value<float>("inStop")), new(fadeInfo.Value<float>("outStart"), fadeInfo.Value<float>("outStop")));
+            fade = fadeInfo is null ? (new(), new()) : (new(fadeInfo.Value<float>("inStart"), fadeInfo.Value<float>("inStop")), new(fadeInfo.Value<float>("outStart"), fadeInfo.Value<float>("outStop")));
             img = track.Value<string>("coverUri");
             var artInfo = track["artists"];
             artists = new Artist[artInfo.Count()];

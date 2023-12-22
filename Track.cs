@@ -141,5 +141,6 @@
                 await Parent.TrackApi.RemoveLikesTracks(id, Parent.UserID);
             }
         }
+        public override string? ToString() => Title;
     }
 }

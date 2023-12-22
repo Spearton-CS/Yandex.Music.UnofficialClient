@@ -177,5 +177,6 @@
         {
             yield break;
         }
+        public override string? ToString() => Title;
     }
 }

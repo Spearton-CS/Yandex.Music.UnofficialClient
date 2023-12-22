@@ -1,5 +1,4 @@
 ﻿using NAudio.Wave;
-using System.IO;
 
 namespace Yandex.Music.UnofficialClient
 {

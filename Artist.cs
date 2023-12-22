@@ -19,7 +19,7 @@
         }
         /// <summary>Y.Music api instance, where cached this artist's info</summary>
         public YMusicApi Parent { get; private set; }
-        public Artist(YMusicApi api, string id, string? name, string? img, string[]? genres, uint? likes, uint? ownTracks, uint? ownAlbums, uint? albums, uint? tracks, (uint, uint, uint)? ratings, (string, string, string, string)[]? links)
+        public Artist(YMusicApi api, string id, string? name = null, string? img = null, string[]? genres = null, uint? likes = null, uint? ownTracks = null, uint? ownAlbums = null, uint? albums = null, uint? tracks = null, (uint, uint, uint)? ratings = null, (string, string, string, string)[]? links = null)
         {
             Parent = api;
             Full = name is not null && img is not null && genres is not null && likes is not null && ownTracks is not null && ownAlbums is not null && albums is not null && tracks is not null && ratings is not null && links is not null;
@@ -151,5 +151,6 @@
         {
             yield break;
         }
+        public override string? ToString() => Name;
     }
 }
