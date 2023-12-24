@@ -7,31 +7,27 @@
         {
             if (Disposed)
                 return;
-            if (Parent?.AlbumsCache.ContainsKey(this) == true)
-                if (Parent.AlbumsCache[this] > 0)
+            if (Parent?.AlbumsCache?.ContainsKey(this) == true)
+                if (Parent.AlbumsCache[this] == 0)
+                    Parent.AlbumsCache.Remove(this);
+                else
                     return;
             Disposed = true;
-            ID = Title = Genre = ImageURL = null;
-            if (Parent?.Disposed == false)
-                foreach (Artist artist in Artists)
+            if (Artists is not null)
+                foreach (var artist in Artists)
                 {
-                    var founded = Parent.ArtistsCache.Where((x) => x.Key == artist);
-                    if (!founded.Any())
-                    {
-                        artist?.Dispose();
-                        continue;
-                    }
-                    Parent.ArtistsCache[artist]--;
-                    if (Parent.ArtistsCache[artist] == 0)
-                        artist.Dispose();
+                    if (Parent?.ArtistsCache?.ContainsKey(artist) == true)
+                        Parent.ArtistsCache[artist]--;
+                    artist?.Dispose();
                 }
             Artists = null;
+            ID = Title = Genre = ImageURL = null;
             Parent = null;
             GC.SuppressFinalize(this);
         }
         /// <summary>Y.Music api instance, where cached this album's info</summary>
-        public YMusicApi Parent { get; private set; }
-        public Album(YMusicApi api, string id, string? title = null, string? genre = null, bool? single = null, uint? year = null, DateTime? release = null, bool? exp = null, uint? tracks = null, uint? likes = null, bool? recent = null, bool? vimp = null, string? img = null, Artist[]? artists = null)
+        public YMusicApi? Parent { get; private set; }
+        public Album(YMusicApi? api, string id, string? title = null, string? genre = null, bool? single = null, uint? year = null, DateTime? release = null, bool? exp = null, uint? tracks = null, uint? likes = null, bool? recent = null, bool? vimp = null, string? img = null, Artist[]? artists = null)
         {
             Parent = api;
             Full = title is not null && genre is not null && single is not null && year is not null && release is not null && exp is not null && tracks is not null && likes is not null && recent is not null && vimp is not null && img is not null && artists is not null;
@@ -52,8 +48,12 @@
         public bool Full { get; private set; }
         public async Task GetFullAsync()
         {
+            if (Disposed)
+                throw new ObjectDisposedException("Album");
             if (Full)
                 return;
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
             var album = (await Parent.AlbumApi.InformAlbum(int.Parse(ID)))["result"];
             Title = album.Value<string>("title");
             Genre = album.Value<string>("genre");
@@ -90,6 +90,7 @@
                 Artist artInf = await Parent.GetArtistAsync(artID);
                 Artists[i] = artInf;
             }
+            Full = true;
         }
         /// <summary>Album's ID</summary>
         public string ID { get; private set; }
@@ -118,6 +119,8 @@
         {
             if (Disposed)
                 throw new ObjectDisposedException("Album");
+            if (ImageURL is null)
+                throw new InvalidOperationException("ImageURL is null");
             Cache.Init();
             string path = $"{Cache.ImagesCacheDir}\\{ID}.album.{width}x{height}";
             FileStream fs = null;
@@ -146,7 +149,9 @@
         public async Task Like()
         {
             if (Disposed)
-                throw new ObjectDisposedException("Artist");
+                throw new ObjectDisposedException("Album");
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
             List<int> id = new() { int.Parse(ID) };
             try
             {
@@ -161,7 +166,9 @@
         public async Task Unlike()
         {
             if (Disposed)
-                throw new ObjectDisposedException("Artist");
+                throw new ObjectDisposedException("Album");
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
             List<int> id = new() { int.Parse(ID) };
             try
             {
@@ -175,8 +182,12 @@
         }
         public async IAsyncEnumerable<Track> EnumerateTracks()
         {
+            if (Disposed)
+                throw new ObjectDisposedException("Album");
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
             yield break;
         }
-        public override string? ToString() => Title;
+        public override string? ToString() => Disposed ? throw new ObjectDisposedException("Album") : Title;
     }
 }

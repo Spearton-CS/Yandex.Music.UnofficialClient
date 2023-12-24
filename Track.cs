@@ -7,49 +7,37 @@
         {
             if (Disposed)
                 return;
-            if (Parent?.TracksCache.ContainsKey(this) == true)
-                if (Parent.TracksCache[this] > 0)
-                    return;
-                else
+            if (Parent?.TracksCache?.ContainsKey(this) == true)
+                if (Parent.TracksCache[this] == 0)
                     Parent.TracksCache.Remove(this);
+                else
+                    return;
             Disposed = true;
-            ID = Title = ImageURL = null;
-            if (Parent?.Disposed == false)
-            {
-                foreach (Album album in Albums)
+            if (Albums is not null)
+                foreach (var album in Albums)
                 {
-                    var founded = Parent.AlbumsCache.Where((x) => x.Key == album);
-                    if (!founded.Any())
-                    {
-                        album?.Dispose();
-                        continue;
-                    }    
-                    Parent.AlbumsCache[album]--;
-                    if (Parent.AlbumsCache[album] == 0)
-                        album.Dispose();
+                    if (Parent?.AlbumsCache?.ContainsKey(album) == true)
+                        Parent.AlbumsCache[album]--;
+                    album?.Dispose();
                 }
-                foreach (Artist artist in Artists)
-                {
-                    var founded = Parent.ArtistsCache.Where((x) => x.Key == artist);
-                    if (!founded.Any())
-                    {
-                        artist?.Dispose();
-                        continue;
-                    }
-                    Parent.ArtistsCache[artist]--;
-                    if (Parent.ArtistsCache[artist] == 0)
-                        artist.Dispose();
-                }
-            }
-            Artists = null;
             Albums = null;
+            if (Artists is not null)
+                foreach (var artist in Artists)
+                {
+                    if (Parent?.ArtistsCache?.ContainsKey(artist) == true)
+                        Parent.ArtistsCache[artist]--;
+                    artist?.Dispose();
+                }
+            Artists = null;
+            ID = Title = ImageURL = null;
             Parent = null;
             GC.SuppressFinalize(this);
         }
-        public YMusicApi Parent { get; private set; }
-        public Track(YMusicApi api, string id, string title, uint duration, bool exp, string img, (KeyValuePair<float, float>, KeyValuePair<float, float>) fade, Artist[] artists, Album[] albums)
+        public YMusicApi? Parent { get; private set; }
+        public Track(YMusicApi? api, string id, string? title = null, uint? duration = null, bool? exp = null, string? img = null, (KeyValuePair<float, float>, KeyValuePair<float, float>)? fade = null, Artist[]? artists = null, Album[]? albums = null, KeyValuePair<string, string>? dlnks = null)
         {
             Parent = api;
+            Full = title is not null && duration is not null && exp is not null && img is not null && fade is not null && artists is not null && albums is not null;
             ID = id;
             Title = title;
             Duration = duration;
@@ -59,19 +47,30 @@
             Artists = artists;
             Albums = albums;
         }
+        public bool Full { get; private set; }
+        public async Task GetFullAsync()
+        {
+            if (Full)
+                return;
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
+        }
         public string ID { get; private set; }
-        public string Title { get; private set; }
-        public uint Duration { get; }
-        public bool Explicit { get; }
-        public string ImageURL { get; private set; }
-        public (KeyValuePair<float, float> In, KeyValuePair<float, float> Out) Fade { get; }
-        public Artist[] Artists { get; private set; }
-        public Album[] Albums { get; private set; }
+        public string? Title { get; private set; }
+        public uint? Duration { get; }
+        public bool? Explicit { get; }
+        public string? ImageURL { get; private set; }
+        public (KeyValuePair<float, float> In, KeyValuePair<float, float> Out)? Fade { get; }
+        public Artist[]? Artists { get; private set; }
+        public Album[]? Albums { get; private set; }
+        public KeyValuePair<string, string>? DirectLinks { get; private set; }
         public bool Downloaded => Disposed ? throw new ObjectDisposedException("Track") : File.Exists($"{Cache.DownloadedTracksCacheDir}\\{ID}.mp3");
         public async Task<Stream> GetStreamAsync(bool hq = true)
         {
-            var directLinks = await Parent.GetDirectLinksAsync(ID);
-            return Disposed ? throw new ObjectDisposedException("Track") : await Temp.HttpClient.GetStreamAsync(hq ? directLinks.Key : directLinks.Value);
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
+            DirectLinks ??= await Parent.GetDirectLinksAsync(ID);
+            return Disposed ? throw new ObjectDisposedException("Track") : await Temp.HttpClient.GetStreamAsync(hq ? DirectLinks.Value.Key : DirectLinks.Value.Value);
         }
         public async Task DownloadAsync(bool hq = true, string? path = null)
         {

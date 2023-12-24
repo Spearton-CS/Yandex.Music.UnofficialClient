@@ -13,14 +13,15 @@ namespace Yandex.Music.UnofficialClient
      * Cache hierarchy:
      * Artist | User
      * Album | Playlist
-     * Track
+     * Track | LocalTrack
      */
     public sealed class YMusicApi : IDisposable
     {
-        public Dictionary<Track, int> TracksCache = new();
-        public Dictionary<Artist, int> ArtistsCache = new();
-        public Dictionary<Album, int> AlbumsCache = new();
-        public Dictionary<Playlist, int> PlaylistsCache = new();
+        public Dictionary<Track, uint> TracksCache = new();
+        public Dictionary<Artist, uint> ArtistsCache = new();
+        public Dictionary<Album, uint> AlbumsCache = new();
+        public Dictionary<Playlist, uint> PlaylistsCache = new();
+        public Dictionary<User, uint> UsersCache = new();
         private SApi searchApi;
         public SApi SearchApi => Disposed ? throw new ObjectDisposedException("YMusicApi") : searchApi;
         private TApi trackApi;
@@ -87,6 +88,12 @@ namespace Yandex.Music.UnofficialClient
                 playlist.Key.Dispose();
             }
             PlaylistsCache = null;
+            foreach (var user in UsersCache)
+            {
+                UsersCache.Remove(user.Key);
+                user.Key.Dispose();
+            }
+            UsersCache = null;
             GC.SuppressFinalize(this);
         }
         public YMusicApi(string token, NetworkParams? np = null)
@@ -503,9 +510,9 @@ namespace Yandex.Music.UnofficialClient
             var founded = TracksCache.Where((x) => x.Key.ID == id);
             if (founded.Any())
             {
-                var inf = founded.First();
-                TracksCache[inf.Key]++;
-                return inf.Key;
+                Track inf = founded.First().Key;
+                TracksCache[inf]++;
+                return inf;
             }
             var result = await TrackApi.GetInformTrack(new() { id });
             var track = result["result"][0];
@@ -561,9 +568,9 @@ namespace Yandex.Music.UnofficialClient
             var founded = AlbumsCache.Where((x) => x.Key.ID == id);
             if (founded.Any())
             {
-                var inf = founded.First();
-                AlbumsCache[inf.Key]++;
-                return inf.Key;
+                Album inf = founded.First().Key;
+                AlbumsCache[inf]++;
+                return inf;
             }
             var album = (await AlbumApi.InformAlbum(int.Parse(id)))["result"];
             string title, genre;
@@ -652,6 +659,19 @@ namespace Yandex.Music.UnofficialClient
             }
             Artist info = new(this, id, name, img, genres, likes, ownTracks, ownAlbums, albums, tracks, ratings, links);
             ArtistsCache.Add(info, 1);
+            return info;
+        }
+        public async Task<Playlist> GetPlaylistAsync(uint uid, uint kind)
+        {
+            var founded = PlaylistsCache.Where((x) => x.Key.UID == uid && x.Key.Kind == kind);
+            if (founded.Any())
+            {
+                var inf = founded.First().Key;
+                PlaylistsCache[inf]++;
+                return inf;
+            }
+            
+            Playlist info = new(this, uid, kind);
             return info;
         }
         public async Task<KeyValuePair<string, string>> GetDirectLinksAsync(string trackID)

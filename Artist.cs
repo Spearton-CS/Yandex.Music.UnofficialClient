@@ -7,8 +7,10 @@
         {
             if (Disposed)
                 return;
-            if (Parent?.ArtistsCache.ContainsKey(this) == true)
-                if (Parent.ArtistsCache[this] > 0)
+            if (Parent?.ArtistsCache?.ContainsKey(this) == true)
+                if (Parent.ArtistsCache[this] == 0)
+                    Parent.ArtistsCache.Remove(this);
+                else
                     return;
             Disposed = true;
             ID = Name = ImageURL = null;
@@ -18,8 +20,8 @@
             GC.SuppressFinalize(this);
         }
         /// <summary>Y.Music api instance, where cached this artist's info</summary>
-        public YMusicApi Parent { get; private set; }
-        public Artist(YMusicApi api, string id, string? name = null, string? img = null, string[]? genres = null, uint? likes = null, uint? ownTracks = null, uint? ownAlbums = null, uint? albums = null, uint? tracks = null, (uint, uint, uint)? ratings = null, (string, string, string, string)[]? links = null)
+        public YMusicApi? Parent { get; private set; }
+        public Artist(YMusicApi? api, string id, string? name = null, string? img = null, string[]? genres = null, uint? likes = null, uint? ownTracks = null, uint? ownAlbums = null, uint? albums = null, uint? tracks = null, (uint, uint, uint)? ratings = null, (string, string, string, string)[]? links = null)
         {
             Parent = api;
             Full = name is not null && img is not null && genres is not null && likes is not null && ownTracks is not null && ownAlbums is not null && albums is not null && tracks is not null && ratings is not null && links is not null;
@@ -38,8 +40,12 @@
         public bool Full { get; private set; }
         public async Task GetFullAsync()
         {
+            if (Disposed)
+                throw new ObjectDisposedException("Artist");
             if (Full)
                 return;
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
             var artist = (await Parent.ArtistApi.InformArtist(int.Parse(ID)))["result"]["artist"];
             Name = artist.Value<string>("name");
             ImageURL = artist.Value<string>("ogImage");
@@ -62,6 +68,7 @@
                 var linkInfo = linksInfo[i];
                 Links[i] = (linkInfo.Value<string>("socialNetwork"), linkInfo.Value<string>("type"), linkInfo.Value<string>("href"), linkInfo.Value<string>("title"));
             }
+            Full = true;
         }
         /// <summary>Artist's ID</summary>
         public string ID { get; private set; }
@@ -88,6 +95,8 @@
         {
             if (Disposed)
                 throw new ObjectDisposedException("Artist");
+            if (ImageURL is null)
+                throw new InvalidOperationException("ImageURL is null");
             Cache.Init();
             string path = $"{Cache.ImagesCacheDir}\\{ID}.artist.{width}x{height}";
             FileStream fs = null;
@@ -117,6 +126,8 @@
         {
             if (Disposed)
                 throw new ObjectDisposedException("Artist");
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
             List<int> id = new() { int.Parse(ID) };
             try
             {
@@ -132,6 +143,8 @@
         {
             if (Disposed)
                 throw new ObjectDisposedException("Artist");
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
             List<int> id = new() { int.Parse(ID) };
             try
             {
@@ -145,12 +158,20 @@
         }
         public async IAsyncEnumerable<Track> EnumerateTracks()
         {
+            if (Disposed)
+                throw new ObjectDisposedException("Artist");
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
             yield break;
         }
         public async IAsyncEnumerable<Album> EnumerateAlbums()
         {
+            if (Disposed)
+                throw new ObjectDisposedException("Artist");
+            if (Parent is null)
+                throw new InvalidOperationException("Parent is null");
             yield break;
         }
-        public override string? ToString() => Name;
+        public override string? ToString() => Disposed ? throw new ObjectDisposedException("Artist") : Name;
     }
 }

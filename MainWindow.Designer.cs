@@ -39,14 +39,9 @@
             PasswordBox = new MaskedTextBox();
             ShowPasswordBox = new CheckBox();
             LoadingPanel = new Panel();
-            LoadingBox2 = new PictureBox();
-            LoadingBox1 = new PictureBox();
             LoginPanel.SuspendLayout();
             LoginStep2Group.SuspendLayout();
             LoginStep1Group.SuspendLayout();
-            LoadingPanel.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)LoadingBox2).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)LoadingBox1).BeginInit();
             SuspendLayout();
             // 
             // LoginPanel
@@ -152,33 +147,11 @@
             // 
             // LoadingPanel
             // 
-            LoadingPanel.Controls.Add(LoadingBox2);
-            LoadingPanel.Controls.Add(LoadingBox1);
             LoadingPanel.Dock = DockStyle.Fill;
             LoadingPanel.Location = new Point(0, 0);
             LoadingPanel.Name = "LoadingPanel";
             LoadingPanel.Size = new Size(634, 450);
             LoadingPanel.TabIndex = 1;
-            // 
-            // LoadingBox2
-            // 
-            LoadingBox2.Image = Properties.Resources.Loading;
-            LoadingBox2.Location = new Point(269, 301);
-            LoadingBox2.Name = "LoadingBox2";
-            LoadingBox2.Size = new Size(64, 64);
-            LoadingBox2.SizeMode = PictureBoxSizeMode.StretchImage;
-            LoadingBox2.TabIndex = 1;
-            LoadingBox2.TabStop = false;
-            // 
-            // LoadingBox1
-            // 
-            LoadingBox1.Image = Properties.Resources.Icon;
-            LoadingBox1.Location = new Point(174, 39);
-            LoadingBox1.Name = "LoadingBox1";
-            LoadingBox1.Size = new Size(256, 256);
-            LoadingBox1.SizeMode = PictureBoxSizeMode.StretchImage;
-            LoadingBox1.TabIndex = 0;
-            LoadingBox1.TabStop = false;
             // 
             // MainWindow
             // 
@@ -195,9 +168,6 @@
             LoginStep2Group.PerformLayout();
             LoginStep1Group.ResumeLayout(false);
             LoginStep1Group.PerformLayout();
-            LoadingPanel.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)LoadingBox2).EndInit();
-            ((System.ComponentModel.ISupportInitialize)LoadingBox1).EndInit();
             ResumeLayout(false);
         }
 
@@ -214,7 +184,5 @@
         private TextBox TwoFactorBox;
         private LinkLabel linkLabel1;
         private Panel LoadingPanel;
-        private PictureBox LoadingBox1;
-        private PictureBox LoadingBox2;
     }
 }
